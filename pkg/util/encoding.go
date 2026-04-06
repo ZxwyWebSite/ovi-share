@@ -1,0 +1,21 @@
+package util
+
+import (
+	"encoding/base64"
+)
+
+//# base64
+
+// Base64 编码
+func Base64Encode(enc *base64.Encoding, src []byte) []byte {
+	dst := MakeNoZero(enc.EncodedLen(len(src)))
+	enc.Encode(dst, src)
+	return dst
+}
+
+// Base64 解码
+func Base64Decode(enc *base64.Encoding, src []byte) ([]byte, error) {
+	dst := MakeNoZero(enc.DecodedLen(len(src)))
+	n, err := enc.Decode(dst, src)
+	return dst[:n], err
+}
