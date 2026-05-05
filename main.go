@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	os.Stdout.WriteString("== OVI-Share v0.0.1 (r260406) ==\n\nThanks: OneDrive Vercel Index\nMade with ❤ by Zxwy & SpencerWoo.\n\n")
+	os.Stdout.WriteString("== OVI-Share v0.0.2 (r260505) ==\n\nThanks: SpencerWooo/OneDrive-Vercel-Index\nMade with ❤ by Zxwy & OvList Contributors.\n\n")
 }
 
 func main() {
@@ -21,15 +21,15 @@ func main() {
 		return
 	}
 
-	os.Stdout.WriteString("init fs...\n")
+	os.Stdout.WriteString("init fs...\n\n")
 
-	fs, err := cfg.Build(context.Background())
+	root, site, err := cfg.Build(context.Background())
 	if err != nil {
 		fmt.Printf("初始化文件系统：%s\n", err)
 		return
 	}
 
-	r := server.Router(fs, cfg.Serv.Cache, cfg.Serv.Static)
+	r := server.Router(root, site, &cfg.Serv)
 
 	fmt.Printf("\nServer started on %s\n", cfg.Serv.Listen)
 

@@ -9,7 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ZxwyWebSite/ovi-share/config"
 	"github.com/ZxwyWebSite/ovi-share/handler"
+	"github.com/ZxwyWebSite/ovi-share/middleware"
 	"github.com/ZxwyWebSite/ovi-share/pkg/util"
 	"github.com/ZxwyWebSite/ovi-share/pkg/vfs"
 )
@@ -34,8 +36,8 @@ func spaHandler(staticDir string, indexFile string) http.HandlerFunc {
 }
 
 // 初始化路由
-func Router(fs vfs.Provider, cache int, static string) http.Handler {
-	h := handler.New(fs, cache)
+func Router(root vfs.Provider, site map[string]vfs.Provider, serv *config.CfgServ) http.Handler {
+	h := handler.New(root, site, serv.Cache)
 
 	mux := http.NewServeMux()
 
@@ -54,7 +56,17 @@ func Router(fs vfs.Provider, cache int, static string) http.Handler {
 	mux.HandleFunc(`GET /api/search/`, h.Search)
 	mux.HandleFunc(`GET /api/thumbnail/`, h.Thumbnail)
 
-	mux.HandleFunc(`GET /`, spaHandler(static, `index.html`))
+	mux.HandleFunc(`GET /`, spaHandler(serv.Static, `index.html`))
+
+	var hdl http.Handler = mux
+	if serv.Cors.Enable {
+		hdl = (&middleware.CorsConfig{
+			AllowOrigins: serv.Cors.AllowOrigins,
+			AllowMethods: []string{http.MethodGet, http.MethodPost},
+			AllowHeaders: []string{`Content-Type`, `Od-Protected-Token`},
+			MaxAge:       86400,
+		}).ToMiddleware()(mux)
+	}
 
 	// Logger
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -62,7 +74,7 @@ func Router(fs vfs.Provider, cache int, static string) http.Handler {
 
 		s := &statusRecorder{w, http.StatusOK}
 
-		mux.ServeHTTP(s, r)
+		hdl.ServeHTTP(s, r)
 
 		var uri string
 		if r.URL.RawQuery != `` {

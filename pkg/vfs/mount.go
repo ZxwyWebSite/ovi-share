@@ -21,9 +21,9 @@ type MountFS struct {
 	nodes []MountPoint
 }
 
-func NewMountFS() *MountFS {
+func NewMountFS(name string) *MountFS {
 	return &MountFS{
-		name:    "/",
+		name:    name,
 		modTime: time.Now(),
 		// mounts:  make(map[string]Provider),
 	}
@@ -51,7 +51,7 @@ func (m *MountFS) Open(ctx context.Context, subPath string) (Node, error) {
 	// 根目录：列出所有挂载点
 	if subPath == "" || subPath == "." {
 		return &MountDir{
-			name: "/",
+			name: m.name,
 			// mounts:  m.mounts,
 			modTime: m.modTime,
 			nodes:   m.nodes,

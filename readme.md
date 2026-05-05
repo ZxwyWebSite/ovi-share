@@ -13,14 +13,17 @@
 
 - 分享挂载，避免账号风控。
 - （TODO）VFS，自定义挂载参数。
+- 注：暂不支持挂载单个文件，请使用文件夹分享
 
 ### 使用
 
 - 目前只有 OneDrive 分享（支持个人版与商业版）与 虚拟目录（用于挂载）
 - 首次启动自动生成默认配置
-- 另外需要下载 `assets.zip` 解压为 `data/build` 提供前端文件
+- 另外需要下载 `assets.zip` 解压为 `data/build` 提供[前端文件](https://github.com/ovlist/frontend)
 
 ### 配置
+
+&emsp;已支持 TypeScript 类型提示，VsCode 打开 `ts` 目录的 `config.js` 即可，之后运行 `node ts/config.js` 也可直接生成配置文件。
 
 <details>
 <summary>结构</summary>
@@ -34,7 +37,7 @@
     // 缓存大小（MB）
     "cache": 16,
     // 静态文件
-    "static": "data/build",
+    "static": "data/build"
   },
   // 元数据，可供引用
   "meta": [

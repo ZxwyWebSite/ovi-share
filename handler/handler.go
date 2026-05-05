@@ -12,14 +12,16 @@ import (
 )
 
 type Handler struct {
-	FS    vfs.Provider
+	Root  vfs.Provider
+	Site  map[string]vfs.Provider
 	Cache *freecache.Cache
 	SF    singleflight.Group
 }
 
-func New(fs vfs.Provider, cache int) *Handler {
+func New(root vfs.Provider, site map[string]vfs.Provider, cache int) *Handler {
 	return &Handler{
-		FS:    fs,
+		Root:  root,
+		Site:  site,
 		Cache: freecache.NewCache(cache * 1024 * 1024),
 	}
 }
@@ -54,7 +56,9 @@ type AppFile struct {
 }
 
 type AppFolder struct {
-	Folder share.DriveChildren `json:"folder"`
+	Folder *share.DriveChildren `json:"folder"`
+
+	Next string `json:"next,omitempty"`
 }
 
 func Json(w http.ResponseWriter, v any, code int) {

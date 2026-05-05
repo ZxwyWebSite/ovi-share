@@ -36,8 +36,12 @@ type DriveItem struct {
 	Size int64 `json:"size"`
 }
 
+// https://learn.microsoft.com/zh-cn/graph/api/driveitem-list-children?view=graph-rest-1.0&tabs=http
+
 type DriveChildren struct {
 	Value []DriveItem `json:"value"`
+
+	OdataNextLink string `json:"@odata.nextLink,omitempty"`
 }
 
 type DriveThumbs struct {
@@ -63,5 +67,5 @@ type DriveThumbs struct {
 
 type Item interface {
 	GetItem() *DriveItem
-	ListItem(ctx context.Context, subPath string) ([]DriveItem, error)
+	ListItem(ctx context.Context, subPath, next string) (*DriveChildren, error)
 }

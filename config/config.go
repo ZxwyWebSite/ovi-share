@@ -1,26 +1,28 @@
 package config
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
-	"strings"
+	"sync"
 
 	"github.com/ZxwyWebSite/ovi-share/pkg/util"
-	"github.com/ZxwyWebSite/ovi-share/pkg/vfs"
-	"github.com/ZxwyWebSite/ovi-share/provider/share"
 )
 
 // 主配置
 type Config struct {
+	// 载入路径
+	path string
+	mu   sync.Mutex
+
 	// 服务器
 	Serv CfgServ `json:"serv"`
 	// 元数据
 	Meta []Provider `json:"meta"`
 	// 根目录
 	Root *Provider `json:"root"`
+	// 站点
+	Site []Provider `json:"site"`
 }
 
 type CfgServ struct {
@@ -30,6 +32,13 @@ type CfgServ struct {
 	Cache int `json:"cache"`
 	// 静态文件
 	Static string `json:"static"`
+	// 跨站配置
+	Cors CfgCors `json:"cors"`
+}
+
+type CfgCors struct {
+	Enable       bool     `json:"enable"`
+	AllowOrigins []string `json:"allowOrigins"`
 }
 
 type Provider struct {
@@ -46,6 +55,12 @@ type Provider struct {
 
 type CfgShare struct {
 	Link string `json:"link"`
+
+	Token  string `json:"token,omitempty"`
+	Expire int64  `json:"expire,omitempty"`
+
+	Root string `json:"root,omitempty"`
+	Path string `json:"path,omitempty"`
 }
 
 var Default = Config{
@@ -53,6 +68,9 @@ var Default = Config{
 		Listen: `:1122`,
 		Cache:  16,
 		Static: `data/build`,
+		Cors: CfgCors{
+			AllowOrigins: []string{`*`},
+		},
 	},
 	Root: &Provider{
 		Type:  `mount`,
@@ -66,7 +84,7 @@ var ErrInit = errors.New(`配置初始化成功，请编辑后重新运行`)
 // 载入
 func Load(cfg string) (*Config, error) {
 	if !util.IsExists(cfg) {
-		mi, _ := json.MarshalIndent(Default, ``, `  `)
+		mi, _ := json.MarshalIndent(&Default, ``, `  `)
 		err := util.SaveFile(cfg, mi)
 		if err == nil {
 			err = ErrInit
@@ -98,7 +116,20 @@ func Load(cfg string) (*Config, error) {
 		}
 	}
 
+	config.path = cfg
 	return &config, nil
+}
+
+// 保存
+func (c *Config) Save(to string) error {
+	if to == `` {
+		to = c.path
+	}
+	mi, _ := json.MarshalIndent(c, ``, `  `)
+	c.mu.Lock()
+	err := util.SaveFile(to, mi)
+	c.mu.Unlock()
+	return err
 }
 
 var ErrSave = errors.New(`save`)
@@ -118,82 +149,12 @@ func Valid(cfg *Config) (err error) {
 		cfg.Serv.Static = Default.Serv.Static
 		err = ErrSave
 	}
+	if cfg.Serv.Cors.AllowOrigins == nil {
+		cfg.Serv.Cors.AllowOrigins = Default.Serv.Cors.AllowOrigins
+		err = ErrSave
+	}
 	if cfg.Root == nil {
 		err = ErrRoot
 	}
 	return
-}
-
-func (c *Config) Build(ctx context.Context) (vfs.Provider, error) {
-	// 首先构建引用
-	println(`// Meta:`)
-	l := len(c.Meta)
-	m := make(map[string]vfs.Provider)
-	for i := 0; i < l; i++ {
-		p, err := buildFS(ctx, &c.Meta[i], m)
-		if err != nil {
-			return nil, fmt.Errorf(`vfs.Build: meta[%d]: %w`, i, err)
-		}
-		m[c.Meta[i].Name] = p
-	}
-	// 然后构建目录
-	println(`// Root:`)
-	p, err := buildFS(ctx, c.Root, m)
-	if err != nil {
-		return nil, fmt.Errorf(`vfs.Build: %w`, err)
-	}
-	return p, nil
-}
-
-// 递归构建
-func buildFS(ctx context.Context, p *Provider, m map[string]vfs.Provider) (vfs.Provider, error) {
-	switch p.Type {
-	case `share`:
-		// OneDrive 分享
-		if p.Share != nil {
-			var s *share.Object
-			var err error
-			if strings.Contains(p.Share.Link, `sharepoint`) {
-				// 商业版
-				c := share.NewBusiness()
-				s, err = c.Object(ctx, p.Share.Link)
-			} else {
-				// 个人版
-				c := share.NewPersonal()
-				s, err = c.Object(ctx, p.Share.Link)
-			}
-			if err != nil {
-				return nil, err
-			}
-			println(vfs.String(s))
-			return s, nil
-		}
-	case `mount`:
-		// 虚拟目录挂载（允许空目录？）
-		// if p.Mount != nil {
-		c := vfs.NewMountFS()
-		l := len(p.Mount)
-		for i := 0; i < l; i++ {
-			f, err := buildFS(ctx, &p.Mount[i], m)
-			if err != nil {
-				return nil, fmt.Errorf(`mount[%d]: %w`, i, err)
-			}
-			c.Mount(p.Mount[i].Name, f)
-			println(vfs.String(f))
-		}
-		c.Build()
-		println(vfs.String(c))
-		return c, nil
-		// }
-	case `ref`:
-		// 元数据引用
-		if r, ok := m[p.Ref]; ok {
-			println(vfs.String(r))
-			return r, nil
-		}
-		return nil, fmt.Errorf(`undefined ref: %s`, p.Ref)
-	default:
-		return nil, fmt.Errorf(`unknown type %q`, p.Type)
-	}
-	return nil, errors.New(`invalid configuration`)
 }

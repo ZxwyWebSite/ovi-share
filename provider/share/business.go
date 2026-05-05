@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -69,7 +68,7 @@ type BusinessFetch struct {
 }
 
 // 从页面获取分享信息
-func (c *Business) Fetch(ctx context.Context, link string) (BusinessFetch, error) {
+func (c *Business) Fetch(ctx context.Context, link string) (*BusinessFetch, error) {
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, link, nil)
 	req.Header[uaKey] = uaFireFox
 
@@ -77,7 +76,7 @@ func (c *Business) Fetch(ctx context.Context, link string) (BusinessFetch, error
 
 	res, err := c.Client.Do(req)
 	if err != nil {
-		return bf, err
+		return nil, err
 	}
 
 	var dInfo shareDirInfo
@@ -113,11 +112,11 @@ func (c *Business) Fetch(ctx context.Context, link string) (BusinessFetch, error
 	})
 	res.Body.Close()
 	if err != nil {
-		return bf, err
+		return nil, err
 	}
-	fmt.Printf("bf: %#v\n", bf)
+	// fmt.Printf("bf: %#v\n", bf)
 
-	return bf, nil
+	return &bf, nil
 }
 
 /// Object
@@ -133,7 +132,7 @@ func (c *Business) Object(ctx context.Context, link string) (*Object, error) {
 }
 
 // 从已知数据初始化
-func (c *Business) ObjectRaw(ctx context.Context, link string, bf BusinessFetch) (*Object, error) {
+func (c *Business) ObjectRaw(ctx context.Context, link string, bf *BusinessFetch) (*Object, error) {
 	c.TM.SetToken(bf.Token, bf.Expire)
 	c.Link = link
 

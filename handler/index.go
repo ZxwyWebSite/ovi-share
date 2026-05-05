@@ -2,9 +2,12 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ZxwyWebSite/ovi-share/pkg/util"
@@ -42,8 +45,27 @@ func (a *Handler) Index(w http.ResponseWriter, r *http.Request) {
 
 	raw := c.Value(`raw`) == true || q.Has(`raw`)
 
-	lk := util.ConcatB(`l:`, qpath) // link
-	ik := util.ConcatB(`i:`, qpath) // info
+	var lk, ik []byte // link, info
+	// 站点
+	fs, vhost := a.Site[r.Host]
+	if fs == nil {
+		fs = a.Root
+		vhost = false
+		lk = util.ConcatB(`l:`, qpath)
+		ik = util.ConcatB(`i:`, qpath)
+	} else {
+		lk = util.ConcatB(r.Host, `:l:`, qpath)
+		ik = util.ConcatB(r.Host, `:i:`, qpath)
+	}
+
+	// 目录暂时不缓存，所以用不到，只有文件才会命中缓存
+	/*next := q.Get(`next`)
+	var ik []byte
+	if raw || next == `` {
+		ik = util.ConcatB(`i:`, qpath) // info
+	} else {
+		ik = util.ConcatB(`i:`, qpath, `:`, next)
+	}*/
 	if raw {
 		val, exp, err := a.Cache.GetWithExpiration(lk)
 		if err == nil {
@@ -59,16 +81,16 @@ func (a *Handler) Index(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	println(`open:`, qpath)
 
 	type ictx struct {
 		n vfs.Node
 		b []byte
 		l string
-		d []share.DriveItem
+		d *share.DriveChildren
 	}
 	v, err, _ := a.SF.Do(util.BytesToString(ik), func() (any, error) {
-		f, err := a.FS.Open(c, qpath)
+		os.Stdout.Write(util.ConcatB(`[OVI] open: `, qpath, "\n"))
+		f, err := fs.Open(c, qpath)
 		if err != nil {
 			return nil, err
 		}
@@ -84,19 +106,31 @@ func (a *Handler) Index(w http.ResponseWriter, r *http.Request) {
 				ic.l = it.ContentDownloadURL
 			} else {
 				// 目录
-				its, err := p.ListItem(c, ``)
+				its, err := p.ListItem(c, ``, q.Get(`next`))
 				if err != nil {
 					return nil, err
 				}
-				l := len(its)
+				l := len(its.Value)
 				// 缓存子项目
 				for i := 0; i < l; i++ {
-					if itm := its[i]; itm.ContentDownloadURL != `` {
+					if itm := its.Value[i]; itm.ContentDownloadURL != `` {
 						d, _ := json.Marshal(AppFile{&itm})
 						itp := path.Join(qpath, itm.Name)
-						a.Cache.Set(util.ConcatB(`i:`, itp), d, maxAge)
-						a.Cache.Set(util.ConcatB(`l:`, itp), util.StringToBytes(itm.ContentDownloadURL), maxAge)
+						var ikp, lkp []byte
+						if vhost {
+							ikp = util.ConcatB(r.Host, `:i:`, itp)
+							lkp = util.ConcatB(r.Host, `:l:`, itp)
+						} else {
+							ikp = util.ConcatB(`i:`, itp)
+							lkp = util.ConcatB(`l:`, itp)
+						}
+						a.Cache.Set(ikp, d, maxAge)
+						a.Cache.Set(lkp, util.StringToBytes(itm.ContentDownloadURL), maxAge)
 					}
+				}
+				// 提取 skiptoken
+				if i := strings.LastIndexByte(its.OdataNextLink, '='); i != -1 {
+					its.OdataNextLink = its.OdataNextLink[i+1:]
 				}
 				// 流式输出
 				ic.d = its
@@ -139,7 +173,7 @@ func (a *Handler) Index(w http.ResponseWriter, r *http.Request) {
 
 					// }
 				}
-				ic.d = o
+				ic.d = &share.DriveChildren{Value: o}
 				/*d, _ := json.Marshal(AppFolder{share.DriveChildren{Value: o}})
 				a.Cache.Set(ik, d, maxAge)
 				ic.b = d*/
@@ -173,7 +207,7 @@ func (a *Handler) Index(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if ic, ok := v.(ictx); ok {
-		println(vfs.String(ic.n))
+		fmt.Fprintf(os.Stdout, "[OVI] node: name=%q, size=%v, modTime=%q, isDir=%v, type=%T\n", ic.n.Name(), ic.n.Size(), ic.n.ModTime().Format(time.DateTime), ic.n.IsDir(), ic.n)
 		w.Header()[hkCC] = CC
 		if raw {
 			if ic.l != `` {
@@ -187,7 +221,7 @@ func (a *Handler) Index(w http.ResponseWriter, r *http.Request) {
 			JsonBlob(w, ic.b, http.StatusOK)
 			return
 		} else if ic.d != nil {
-			Json(w, AppFolder{share.DriveChildren{Value: ic.d}}, http.StatusOK)
+			Json(w, AppFolder{ic.d, ic.d.OdataNextLink}, http.StatusOK)
 			return
 		}
 	}

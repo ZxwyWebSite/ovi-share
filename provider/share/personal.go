@@ -170,7 +170,7 @@ func (c *Object) SubPath(sub, end string) string {
 }
 
 // 列出相对当前目录
-func (c *Object) ListItem(ctx context.Context, subPath string) ([]DriveItem, error) {
+func (c *Object) ListItem(ctx context.Context, subPath, next string) (*DriveChildren, error) {
 	token, err := c.GetToken()
 	if err != nil {
 		return nil, err
@@ -178,10 +178,19 @@ func (c *Object) ListItem(ctx context.Context, subPath string) ([]DriveItem, err
 
 	var uri string
 	if subPath == `` || subPath == `/` || subPath == `.` {
-		uri = util.Concat(c.Root, `/drives/`, c.Item.ParentReference.DriveID, `/items/`, c.Item.ID, `/children`)
+		if next != `` {
+			uri = util.Concat(c.Root, `/drives/`, c.Item.ParentReference.DriveID, `/items/`, c.Item.ID, `/children`, `?$skipToken=`, next)
+		} else {
+			uri = util.Concat(c.Root, `/drives/`, c.Item.ParentReference.DriveID, `/items/`, c.Item.ID, `/children`)
+		}
 	} else {
 		// uri = util.Concat(c.Root, c.Item.ParentReference.Path[:30], c.SubPath(subPath), `:/children`)
-		uri = c.SubPath(subPath, `/children`)
+		if next != `` {
+			off := 14 + len(c.Item.ParentReference.DriveID)
+			uri = util.Concat(c.Root, c.Item.ParentReference.Path[:off], url.PathEscape(path.Join(c.Item.ParentReference.Path[off:], `/`, c.Item.Name, subPath)), `:`, `/children`, `?$skipToken=`, next)
+		} else {
+			uri = c.SubPath(subPath, `/children`)
+		}
 	}
 	// println(`list:`, uri)
 
@@ -212,21 +221,21 @@ func (c *Object) ListItem(ctx context.Context, subPath string) ([]DriveItem, err
 		return nil, err
 	}
 
-	return out.Value, nil
+	return &out, nil
 }
 
 // 列出相对当前目录
 func (c *Object) ListRaw(ctx context.Context, subPath string) ([]*Object, error) {
-	items, err := c.ListItem(ctx, subPath)
+	items, err := c.ListItem(ctx, subPath, ``)
 	if err == nil {
-		if l := len(items); l != 0 {
+		if l := len(items.Value); l != 0 {
 			obj := make([]*Object, l)
 			for i := 0; i < l; i++ {
 				obj[i] = &Object{
 					Client:   c.Client,
 					GetToken: c.GetToken,
 					Root:     c.Root,
-					Item:     &items[i],
+					Item:     &items.Value[i],
 				}
 			}
 			return obj, nil
