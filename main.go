@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	os.Stdout.WriteString("== OVI-Share v0.0.2 (r260505) ==\n\nThanks: SpencerWooo/OneDrive-Vercel-Index\nMade with ❤ by Zxwy & OvList Contributors.\n\n")
+	os.Stdout.WriteString("== OVI-Share v0.0.3 (r260510) ==\n\nThanks: SpencerWooo/OneDrive-Vercel-Index\nMade with ❤ by Zxwy & OvList Contributors.\n\n")
 }
 
 func main() {
@@ -29,7 +29,7 @@ func main() {
 		return
 	}
 
-	r := server.Router(root, site, &cfg.Serv)
+	r := server.Router(root, site, cfg)
 
 	fmt.Printf("\nServer started on %s\n", cfg.Serv.Listen)
 

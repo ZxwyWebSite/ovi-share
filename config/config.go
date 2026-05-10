@@ -51,6 +51,14 @@ type Provider struct {
 	Ref string `json:"ref,omitempty"`
 	// 挂载目录
 	Mount []Provider `json:"mount,omitempty"`
+	// 密码保护
+	Odpt []CfgOdpt `json:"odpt,omitempty"`
+}
+
+type CfgOdpt struct {
+	Prefix   string `json:"prefix"`
+	Password string `json:"password"`
+	Cache    string `json:"-"`
 }
 
 type CfgShare struct {
@@ -122,11 +130,11 @@ func Load(cfg string) (*Config, error) {
 
 // 保存
 func (c *Config) Save(to string) error {
+	c.mu.Lock()
 	if to == `` {
 		to = c.path
 	}
 	mi, _ := json.MarshalIndent(c, ``, `  `)
-	c.mu.Lock()
 	err := util.SaveFile(to, mi)
 	c.mu.Unlock()
 	return err
@@ -145,10 +153,10 @@ func Valid(cfg *Config) (err error) {
 		cfg.Serv.Cache = Default.Serv.Cache
 		err = ErrSave
 	}
-	if cfg.Serv.Static == `` {
+	/*if cfg.Serv.Static == `` {
 		cfg.Serv.Static = Default.Serv.Static
 		err = ErrSave
-	}
+	}*/
 	if cfg.Serv.Cors.AllowOrigins == nil {
 		cfg.Serv.Cors.AllowOrigins = Default.Serv.Cors.AllowOrigins
 		err = ErrSave

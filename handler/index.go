@@ -49,6 +49,23 @@ func (a *Handler) Index(w http.ResponseWriter, r *http.Request) {
 	// 站点
 	fs, vhost := a.Site[r.Host]
 	if fs == nil {
+		for i, l := 0, len(a.Odpt); i < l; i++ {
+			if strings.HasPrefix(qpath, a.Odpt[i].Prefix) {
+				odpt := q.Get(`odpt`)
+				if odpt == `` {
+					h := r.Header[`Od-Protected-Token`]
+					if len(h) != 0 {
+						odpt = h[0]
+					}
+				}
+				w.Header()[`Vary`] = append(w.Header()[`Vary`], `Od-Protected-Token`)
+				if odpt != a.Odpt[i].Cache {
+					Error(w, `protected`, http.StatusUnauthorized)
+					return
+				}
+				break
+			}
+		}
 		fs = a.Root
 		vhost = false
 		lk = util.ConcatB(`l:`, qpath)

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ZxwyWebSite/ovi-share/pkg/util"
@@ -47,6 +48,23 @@ func (a *Handler) Thumbnail(w http.ResponseWriter, r *http.Request) {
 	ti := string(byte('0' + i))
 	fs, vhost := a.Site[r.Host]
 	if fs == nil {
+		for i, l := 0, len(a.Odpt); i < l; i++ {
+			if strings.HasPrefix(qpath, a.Odpt[i].Prefix) {
+				odpt := q.Get(`odpt`)
+				if odpt == `` {
+					h := r.Header[`Od-Protected-Token`]
+					if len(h) != 0 {
+						odpt = h[0]
+					}
+				}
+				w.Header()[`Vary`] = append(w.Header()[`Vary`], `Od-Protected-Token`)
+				if odpt != a.Odpt[i].Cache {
+					Error(w, `protected`, http.StatusUnauthorized)
+					return
+				}
+				break
+			}
+		}
 		fs = a.Root
 		vhost = false
 		tk = util.ConcatB(`t:`, qpath, `:`, ti)

@@ -4,7 +4,7 @@ type Config = {
   /**元数据 */
   meta: Provider[];
   /**根目录 */
-  root: Provider;
+  root: Provider & odpt;
   /**站点 */
   site?: Provider[]; //Record<string, Provider>;
 };
@@ -56,3 +56,13 @@ type Provider = {
       mount?: Provider[];
     }
 );
+
+type odpt = {
+  /**路径保护 */
+  odpt?: {
+    /**匹配前缀（以 / 开头） */
+    prefix: string;
+    /**密码 */
+    password: string;
+  }[];
+};

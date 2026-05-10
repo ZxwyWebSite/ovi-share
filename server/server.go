@@ -36,8 +36,8 @@ func spaHandler(staticDir string, indexFile string) http.HandlerFunc {
 }
 
 // 初始化路由
-func Router(root vfs.Provider, site map[string]vfs.Provider, serv *config.CfgServ) http.Handler {
-	h := handler.New(root, site, serv.Cache)
+func Router(root vfs.Provider, site map[string]vfs.Provider, conf *config.Config) http.Handler {
+	h := handler.New(root, site, conf.Root.Odpt, conf.Serv.Cache)
 
 	mux := http.NewServeMux()
 
@@ -56,12 +56,14 @@ func Router(root vfs.Provider, site map[string]vfs.Provider, serv *config.CfgSer
 	mux.HandleFunc(`GET /api/search/`, h.Search)
 	mux.HandleFunc(`GET /api/thumbnail/`, h.Thumbnail)
 
-	mux.HandleFunc(`GET /`, spaHandler(serv.Static, `index.html`))
+	if conf.Serv.Static != `` {
+		mux.HandleFunc(`GET /`, spaHandler(conf.Serv.Static, `index.html`))
+	}
 
 	var hdl http.Handler = mux
-	if serv.Cors.Enable {
+	if conf.Serv.Cors.Enable {
 		hdl = (&middleware.CorsConfig{
-			AllowOrigins: serv.Cors.AllowOrigins,
+			AllowOrigins: conf.Serv.Cors.AllowOrigins,
 			AllowMethods: []string{http.MethodGet, http.MethodPost},
 			AllowHeaders: []string{`Content-Type`, `Od-Protected-Token`},
 			MaxAge:       86400,
